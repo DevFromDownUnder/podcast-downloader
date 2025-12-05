@@ -1,0 +1,1427 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Podcast Downloader</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Configure Tailwind to look for the 'dark' class on the <html> element
+        tailwind.config = {
+            darkMode: 'class', 
+            theme: {
+                extend: {
+                    colors: {
+                        // Define custom colors or extensions if needed
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Use Inter font -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            transition: background-color 0.3s;
+        }
+        /* Ensure the body and html take full height for proper h-screen behavior */
+        html, body {
+            height: 100%;
+        }
+        
+        /* Base Light Mode Styles (Existing) */
+        body {
+            background-color: #f3f4f6;
+        }
+        
+        /* Dark Mode Overrides applied when 'dark' class is present on <html> */
+        html.dark body {
+            background-color: #0f172a; /* Slate 900 equivalent */
+        }
+        
+        /* Utility class for fixed width, right-aligned numbers */
+        .w-speed-stat {
+            width: 8rem; /* Sufficient width for common speed formats like 10.5 MB/s */
+            display: inline-block;
+            text-align: right;
+        }
+    </style>
+</head>
+<body class="text-gray-900 dark:text-gray-100">
+
+<!-- Updated container: removed max-w-5xl and justify-center items-center -->
+<div class="h-screen p-4 sm:p-8 flex flex-col">
+    <!-- Main content box now uses full width (w-full) -->
+    <div class="w-full h-full flex flex-col bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 sm:p-8 transition duration-300">
+        
+        <!-- Header and Controls (Fixed height content: flex-shrink-0) -->
+        <h1 class="text-3xl font-extrabold text-gray-900 dark:text-indigo-400 mb-6 border-b pb-2 flex-shrink-0 flex justify-between items-center transition duration-300">
+            Podcast Episode Downloader
+            
+            <!-- Dark Mode Toggle -->
+            <div class="flex items-center space-x-2 flex-shrink-0">
+                <!-- Sun Icon (Visible in Light Mode) -->
+                <svg id="sunIcon" class="w-6 h-6 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                
+                <label for="darkModeToggle" class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="darkModeToggle" value="" class="sr-only peer">
+                    <!-- Toggle Slider -->
+                    <div class="w-11 h-6 bg-gray-200 dark:bg-slate-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                </label>
+                
+                <!-- Moon Icon (Visible in Dark Mode) -->
+                <svg id="moonIcon" class="w-6 h-6 text-indigo-400 hidden" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M17.293 13.047A7.986 7.986 0 0013 5a7.986 7.986 0 00-8.293 8.047 7.985 7.985 0 0012.586 0zM12 18a6 6 0 110-12 6 6 0 010 12z" clip-rule="evenodd" fill-rule="evenodd"></path></svg>
+            </div>
+            <!-- END Dark Mode Toggle -->
+        </h1>
+
+        <div class="flex flex-col gap-4 mb-6 flex-shrink-0">
+            <!-- RSS URL and Fetch -->
+            <div class="flex flex-col md:flex-row md:items-end gap-3">
+                <div class="flex-grow">
+                    <label for="rssUrl" class="block text-sm font-medium text-gray-700 dark:text-gray-300">RSS Feed URL</label>
+                    <input type="url" id="rssUrl" placeholder="e.g., https://historyofrome.libsyn.com/rss"
+                           class="mt-1 block w-full rounded-lg border-gray-300 dark:border-slate-600 shadow-sm p-3 focus:border-indigo-500 focus:ring-indigo-500 transition duration-150 ease-in-out bg-white dark:bg-slate-700 dark:text-gray-100"
+                           value="">
+                </div>
+
+                <div class="flex items-center space-x-2">
+                    <label for="concurrentInput" class="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Concurrent:</label>
+                    <input type="number" id="concurrentInput" value="5" min="1" max="100"
+                           class="w-16 rounded-lg border-gray-300 dark:border-slate-600 shadow-sm p-3 text-center focus:border-indigo-500 focus:ring-indigo-500 bg-white dark:bg-slate-700 dark:text-gray-100">
+                </div>
+
+                <button id="fetchButton"
+                        class="w-full md:w-auto px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg shadow-md transition duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0">
+                    Fetch Episodes
+                </button>
+            </div>
+            
+            <!-- Log Management and Filtering -->
+            <div class="flex flex-wrap gap-3 items-center mt-2 p-3 bg-gray-50 dark:bg-slate-700 rounded-lg border dark:border-slate-600">
+                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Log/Settings:</span>
+                
+                <input type="file" id="logFileInput" accept=".json" class="hidden">
+                <!-- UPDATED LABEL: Import Log/Settings -->
+                <button id="importLogButton"
+                        class="px-4 py-2 text-sm font-medium rounded-lg bg-gray-200 dark:bg-slate-600 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-slate-500 transition">
+                    Import Log/Settings File
+                </button>
+
+                <!-- UPDATED LABEL: Export Log/Settings -->
+                <button id="exportLogButton" disabled
+                        class="px-4 py-2 text-sm font-medium rounded-lg bg-teal-600 text-white hover:bg-teal-700 transition disabled:opacity-50">
+                    Export Log/Settings (<span id="logCount">0</span>)
+                </button>
+
+                <div class="flex items-center ml-auto">
+                    <!-- CHECKED BY DEFAULT IN JS -->
+                    <input type="checkbox" id="autoDownloadLogCheckbox" class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 dark:bg-slate-600 dark:border-slate-500">
+                    <label for="autoDownloadLogCheckbox" class="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300 select-none">
+                        Auto-Export Log on Finish
+                    </label>
+                </div>
+
+                <div class="flex items-center">
+                    <!-- CHECKED BY DEFAULT IN JS -->
+                    <input type="checkbox" id="hideCompletedCheckbox" class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 dark:bg-slate-600 dark:border-slate-500">
+                    <label for="hideCompletedCheckbox" class="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300 select-none">
+                        Hide Previously Downloaded
+                    </label>
+                </div>
+            </div>
+        </div>
+
+
+        <div id="statusMessage" class="mb-4 p-3 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-lg hidden flex-shrink-0" role="status"></div>
+        <div id="errorMessage" class="mb-4 p-3 bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 rounded-lg hidden flex-shrink-0" role="alert"></div>
+
+        <!-- Episode Lists Container: Takes all remaining vertical space (flex-grow) -->
+        <div class="grid md:grid-cols-2 gap-8 flex-grow overflow-hidden">
+            
+            <!-- Available Episodes List Column -->
+            <div class="flex flex-col h-full min-h-0">
+                <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-3 flex justify-between items-center flex-shrink-0">
+                    Available Episodes
+                    <span id="episodeCount" class="text-sm font-medium text-gray-500">0 loaded</span>
+                </h2>
+                <!-- List: flex-grow makes it fill remaining space, overflow-y-auto enables scrolling -->
+                <ul id="availableList" class="flex-grow border border-gray-200 dark:border-slate-600 rounded-lg divide-y divide-gray-200 dark:divide-slate-700 bg-gray-50 dark:bg-slate-700 overflow-y-auto">
+                    <li class="p-3 text-gray-500 dark:text-gray-400 text-sm text-center">Fetch episodes to see the list.</li>
+                </ul>
+                <div class="mt-4 flex flex-wrap gap-2 flex-shrink-0">
+                    <button id="downloadAllButton" disabled class="px-4 py-2 text-sm font-medium rounded-lg bg-green-500 text-white hover:bg-green-600 transition disabled:opacity-50">
+                        Download All
+                    </button>
+                    <!-- SELECT NEXT 10 IS HERE -->
+                    <button id="selectNextTenButton" disabled class="px-4 py-2 text-sm font-medium rounded-lg bg-indigo-200 text-indigo-800 hover:bg-indigo-300 transition disabled:opacity-50">
+                        Select Next 10
+                    </button>
+                    <button id="downloadSelectedButton" disabled class="px-4 py-2 text-sm font-medium rounded-lg bg-indigo-500 text-white hover:bg-indigo-600 transition disabled:opacity-50">
+                        Download Selected
+                    </button>
+                    <!-- END OF BUTTON BLOCK -->
+                    <!-- NEW: Resume All button -->
+                    <button id="resumeAllButton" disabled class="px-4 py-2 text-sm font-medium rounded-lg bg-green-600 text-white hover:bg-green-700 transition disabled:opacity-50">
+                        Resume All
+                    </button>
+                    <button id="pauseAllButton" disabled class="px-4 py-2 text-sm font-medium rounded-lg bg-yellow-500 text-white hover:bg-yellow-600 transition disabled:opacity-50">
+                        Pause All
+                    </button>
+                    <button id="cancelAllButton" disabled class="px-4 py-2 text-sm font-medium rounded-lg bg-red-700 text-white hover:bg-red-800 transition disabled:opacity-50">
+                        Cancel All
+                    </button>
+                    <button id="clearCompletedButton" disabled class="px-4 py-2 text-sm font-medium rounded-lg bg-red-500 text-white hover:bg-red-600 transition disabled:opacity-50">
+                        Clear Finished
+                    </button>
+                </div>
+            </div>
+
+            <!-- Download Queue/Status List Column -->
+            <div class="flex flex-col h-full min-h-0">
+                <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-3 flex-shrink-0">
+                    Download Queue
+                </h2>
+                <!-- Aggregate Stats Container: TOTAL SPEED is now right-aligned -->
+                <div id="queueStatsContainer" class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 p-3 bg-indigo-50 dark:bg-indigo-900 rounded-xl border border-indigo-200 dark:border-indigo-700 shadow-inner flex-shrink-0">
+                    <div class="flex justify-between flex-wrap text-indigo-800 dark:text-indigo-200">
+                        <!-- Total Speed: Used w-speed-stat class for stable width and text-right -->
+                        <span class="font-bold">Total Speed: <span id="totalSpeed" class="w-speed-stat text-right">0.00 B/s</span></span>
+                        <span>Active: <span id="activeCount">0</span></span>
+                    </div>
+                    <div class="flex justify-between flex-wrap text-gray-600 dark:text-gray-400 mt-1 pt-1 border-t border-indigo-100 dark:border-indigo-700">
+                        <span>Queued: <span id="queuedCount">0</span></span>
+                        <span>Completed: <span id="completedCount">0</span></span>
+                    </div>
+                </div>
+                <!-- List: flex-grow makes it fill remaining space, overflow-y-auto enables scrolling -->
+                <ul id="queueList" class="flex-grow border border-gray-200 dark:border-slate-600 rounded-lg divide-y divide-gray-200 dark:divide-slate-700 bg-gray-50 dark:bg-slate-700 overflow-y-auto">
+                    <li class="p-3 text-gray-500 dark:text-gray-400 text-sm text-center">Downloads will appear here.</li>
+                </ul>
+            </div>
+        </div>
+        
+    </div>
+</div>
+
+<script type="module">
+// -------------------------------------------------------------------------
+
+// --- IndexedDB Constants & Setup ---
+const DB_NAME = 'PodcastDownloaderDB';
+const STORE_NAME = 'settings_log_store';
+const DATA_KEY = 'app_state_data';
+const DB_VERSION = 1;
+let dbInstance = null;
+
+/**
+ * Opens the IndexedDB database, creating the object store if necessary.
+ * @returns {Promise<IDBDatabase>} The IDB database instance.
+ */
+function openDB() {
+    return new Promise((resolve, reject) => {
+        if (dbInstance) {
+            resolve(dbInstance);
+            return;
+        }
+
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+        request.onerror = (event) => {
+            console.error("IndexedDB error:", event.target.errorCode);
+            reject(event.target.error);
+        };
+
+        request.onsuccess = (event) => {
+            dbInstance = event.target.result;
+            resolve(dbInstance);
+        };
+
+        request.onupgradeneeded = (event) => {
+            const db = event.target.result;
+            if (!db.objectStoreNames.contains(STORE_NAME)) {
+                db.createObjectStore(STORE_NAME);
+            }
+        };
+    });
+}
+
+/**
+ * Saves the entire application state (settings and log) to IndexedDB.
+ * @param {object} state - The object containing appSettings and completedLogUrls.
+ */
+async function saveStateToDB(state) {
+    try {
+        const db = await openDB();
+        const transaction = db.transaction([STORE_NAME], 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        
+        // Add a timestamp for user context
+        state.appSettings.lastSaved = Date.now();
+        state.appSettings.theme = getCurrentTheme(); // Save current theme
+        
+        const request = store.put(state, DATA_KEY);
+
+        await new Promise((resolve, reject) => {
+            request.onsuccess = () => resolve();
+            request.onerror = (event) => reject(event.target.error);
+        });
+        
+        // Update UI to reflect save time
+        document.getElementById('statusMessage').textContent = `Settings and log saved locally at ${new Date(state.appSettings.lastSaved).toLocaleTimeString()}.`;
+        document.getElementById('statusMessage').classList.remove('hidden');
+
+    } catch (error) {
+        console.error("Failed to save state to IndexedDB:", error);
+        // Do not show an aggressive error, as local storage might be full/unavailable
+    }
+}
+
+/**
+ * Loads the application state (settings and log) from IndexedDB.
+ * @returns {Promise<object | null>} The loaded state object, or null if nothing is found.
+ */
+async function loadStateFromDB() {
+    try {
+        const db = await openDB();
+        const transaction = db.transaction([STORE_NAME], 'readonly');
+        const store = db.transaction([STORE_NAME], 'readonly').objectStore(STORE_NAME);
+        const request = store.get(DATA_KEY);
+
+        const loadedState = await new Promise((resolve, reject) => {
+            request.onsuccess = (event) => resolve(event.target.result);
+            request.onerror = (event) => reject(event.target.error);
+        });
+        
+        return loadedState;
+    } catch (error) {
+        console.warn("Failed to load state from IndexedDB, returning null:", error);
+        return null;
+    }
+}
+
+/**
+ * Wrapper to get the current global state for saving/exporting.
+ */
+function getCurrentAppState() {
+    // Ensure appSettings reflects current UI state before saving
+    appSettings.rssUrl = rssUrlInput.value;
+    appSettings.concurrentLimit = Math.max(1, Math.min(100, parseInt(concurrentInput.value) || 5));
+    appSettings.hidePreviousState = hideCompletedCheckbox.checked;
+    appSettings.autoDownloadLogState = autoDownloadLogCheckbox.checked;
+    appSettings.theme = getCurrentTheme(); // Ensure theme is saved
+
+    return {
+        completedLogUrls: Array.from(completedLogUrls),
+        appSettings: appSettings,
+    };
+}
+
+/**
+ * Saves the current state to IndexedDB.
+ */
+function saveAppState() {
+    const state = getCurrentAppState();
+    saveStateToDB(state);
+}
+
+
+// --- Global State and Constants ---
+const MAX_RETRIES = 5;
+const LOG_FILENAME = 'podcast_downloader_settings_log.json'; 
+
+/** @type {Set<string>} */
+let completedLogUrls = new Set(); 
+
+let appSettings = {
+    rssUrl: "https://rss.libsyn.com/shows/17332/destinations/5627.xml", 
+    concurrentLimit: 5,
+    hidePreviousState: true, 
+    autoDownloadLogState: true, 
+    logFormatVersion: 2,
+    lastSaved: 0, 
+    theme: 'dark' // Default theme is now dark
+};
+
+let episodes = [];
+let activeDownloads = 0; 
+let concurrentLimit; 
+
+// --- DOM Elements ---
+const htmlElement = document.documentElement;
+const darkModeToggle = document.getElementById('darkModeToggle');
+const sunIcon = document.getElementById('sunIcon');
+const moonIcon = document.getElementById('moonIcon');
+
+const rssUrlInput = document.getElementById('rssUrl');
+const fetchButton = document.getElementById('fetchButton');
+const availableList = document.getElementById('availableList');
+const queueList = document.getElementById('queueList');
+const episodeCountSpan = document.getElementById('episodeCount');
+const logCountSpan = document.getElementById('logCount');
+
+const concurrentInput = document.getElementById('concurrentInput');
+const statusMessage = document.getElementById('statusMessage');
+const errorMessage = document.getElementById('errorMessage');
+const downloadAllButton = document.getElementById('downloadAllButton');
+const downloadSelectedButton = document.getElementById('downloadSelectedButton');
+const clearCompletedButton = document.getElementById('clearCompletedButton');
+const pauseAllButton = document.getElementById('pauseAllButton');
+const cancelAllButton = document.getElementById('cancelAllButton');
+const resumeAllButton = document.getElementById('resumeAllButton'); 
+
+const importLogButton = document.getElementById('importLogButton'); 
+const logFileInput = document.getElementById('logFileInput');
+const exportLogButton = document.getElementById('exportLogButton');
+
+const hideCompletedCheckbox = document.getElementById('hideCompletedCheckbox');
+const autoDownloadLogCheckbox = document.getElementById('autoDownloadLogCheckbox'); 
+const selectNextTenButton = document.getElementById('selectNextTenButton');
+
+
+// --- Theme Management ---
+
+/**
+ * Gets the current theme applied to the <html> element.
+ * @returns {string} 'dark' or 'light'.
+ */
+function getCurrentTheme() {
+    return htmlElement.classList.contains('dark') ? 'dark' : 'light';
+}
+
+/**
+ * Applies the selected theme (dark/light) to the document and updates storage.
+ * @param {string} theme - 'dark' or 'light'.
+ */
+function applyTheme(theme) {
+    const isDark = theme === 'dark';
+    
+    // 1. Toggle classes on <html> for CSS
+    htmlElement.classList.toggle('dark', isDark);
+
+    // 2. Update toggle checkbox state
+    darkModeToggle.checked = isDark;
+
+    // 3. Update icon visibility
+    sunIcon.classList.toggle('hidden', isDark);
+    moonIcon.classList.toggle('hidden', !isDark);
+    
+    // 4. Save preference (this will be handled by saveAppState on setting change, but we update localStorage immediately for responsiveness)
+    localStorage.setItem('theme', theme);
+}
+
+/**
+ * Loads the theme preference from localStorage or appSettings.
+ */
+function loadTheme() {
+    // 1. Check localStorage first (instant response)
+    let preferredTheme = localStorage.getItem('theme');
+    
+    // 2. If not in localStorage, check appSettings (loaded from IndexedDB)
+    if (!preferredTheme) {
+        preferredTheme = appSettings.theme;
+    }
+
+    // 3. Apply the theme (defaulting to 'dark')
+    applyTheme(preferredTheme || 'dark');
+}
+
+
+// --- Utility Functions ---
+
+function showMessage(message, isError = false) {
+    if (isError) {
+        statusMessage.classList.add('hidden');
+        errorMessage.textContent = message;
+        errorMessage.classList.remove('hidden');
+    } else {
+        errorMessage.classList.add('hidden');
+        statusMessage.textContent = message;
+        statusMessage.classList.remove('hidden');
+    }
+}
+
+function clearMessages() {
+    statusMessage.classList.add('hidden');
+    errorMessage.classList.add('hidden');
+}
+
+function formatSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
+function formatSpeed(bytesPerSecond) {
+    if (bytesPerSecond === 0) return '0.00 B/s';
+    const k = 1024;
+    const sizes = ['B/s', 'KB/s', 'MB/s', 'GB/s'];
+    const i = Math.floor(Math.log(bytesPerSecond) / Math.log(k));
+    return parseFloat((bytesPerSecond / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+async function fetchWithRetry(fetcher, maxRetries = MAX_RETRIES) {
+    for (let i = 0; i < maxRetries; i++) {
+        try {
+            return await fetcher();
+        } catch (error) {
+            if (error.name === 'AbortError') { throw error; }
+            if (i === maxRetries - 1) {
+                console.error("Fetch failed after multiple retries:", error);
+                throw error;
+            }
+            const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
+            await new Promise(resolve => setTimeout(resolve, delay));
+        }
+    }
+}
+
+function extractEpisodes(xmlText) {
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+    
+    if (xmlDoc.getElementsByTagName('parsererror').length > 0) {
+        throw new Error("Failed to parse RSS feed. Please check the URL and format.");
+    }
+
+    const items = xmlDoc.querySelectorAll('item');
+    const newEpisodes = [];
+
+    items.forEach((item, index) => {
+        const titleElement = item.querySelector('title');
+        const enclosureElement = item.querySelector('enclosure');
+        
+        if (titleElement && enclosureElement) {
+            const title = titleElement.textContent.trim();
+            const url = enclosureElement.getAttribute('url');
+            const length = parseInt(enclosureElement.getAttribute('length') || '0');
+            
+            if (url) {
+                const sanitizedTitle = title.replace(/[\\/:*?"<>|]/g, '').trim(); 
+                const fileExtensionMatch = url.match(/\.([^.?]+)(\?|$)/);
+                const extension = fileExtensionMatch ? fileExtensionMatch[1].toLowerCase() : 'mp3';
+                const fileName = `${sanitizedTitle}.${extension}`;
+                
+                // Determine initial status based on the log
+                let initialStatus = completedLogUrls.has(url) ? 'previously_completed' : 'available';
+
+                newEpisodes.push({
+                    title: title,
+                    url: url,
+                    fileName: fileName,
+                    status: initialStatus,
+                    id: crypto.randomUUID(),
+                    listIndex: index,
+                    downloadedBytes: 0,
+                    totalBytes: length,
+                    progress: 0,
+                    speed: 0, 
+                });
+            }
+        }
+    });
+    
+    return newEpisodes;
+}
+
+
+// --- Log File Management Functions (Renamed functions) ---
+
+/**
+ * Applies loaded settings to the global state and UI.
+ * @param {object} settings - The loaded settings object.
+ */
+function applySettings(settings) {
+    // Merge new settings with defaults
+    appSettings = {
+        ...appSettings, // Preserve versioning
+        ...settings, // Overwrite with loaded settings
+        // Ensure concurrentLimit is valid
+        concurrentLimit: Math.max(1, Math.min(100, parseInt(settings.concurrentLimit) || appSettings.concurrentLimit)),
+        // Ensure booleans are correctly set, using defaults if undefined
+        hidePreviousState: settings.hidePreviousState !== undefined ? settings.hidePreviousState : appSettings.hidePreviousState,
+        autoDownloadLogState: settings.autoDownloadLogState !== undefined ? settings.autoDownloadLogState : appSettings.autoDownloadLogState,
+        theme: settings.theme !== undefined ? settings.theme : appSettings.theme
+    };
+
+    // Update UI based on loaded settings
+    rssUrlInput.value = appSettings.rssUrl;
+    concurrentInput.value = appSettings.concurrentLimit;
+    hideCompletedCheckbox.checked = appSettings.hidePreviousState;
+    autoDownloadLogCheckbox.checked = appSettings.autoDownloadLogState;
+    
+    // Apply theme from loaded settings (will be overwritten by localStorage if it exists)
+    applyTheme(appSettings.theme); 
+
+    concurrentLimit = appSettings.concurrentLimit;
+}
+
+
+/**
+ * Imports completed episode URLs and app settings from a user-selected JSON file.
+ * @param {File} file - The log file selected by the user.
+ */
+function importLogFile(file) {
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+        try {
+            const fileContent = JSON.parse(event.target.result);
+
+            let newSettings = {};
+            let newUrls = [];
+
+            // 1. Handle old log format (simple array of strings)
+            if (Array.isArray(fileContent)) {
+                 newUrls = fileContent;
+                 // Use default settings
+                 newSettings = appSettings;
+                 showMessage(`Successfully imported ${newUrls.length} entries from an older log format. Saving to IndexedDB...`, false);
+            } 
+            // 2. Handle new log format (structured object)
+            else if (typeof fileContent === 'object' && fileContent !== null) {
+                newSettings = fileContent.appSettings || {}; // Updated to appSettings key
+                newUrls = fileContent.completedLogUrls || []; // Updated to completedLogUrls key
+                showMessage(`Successfully imported ${newUrls.length} log entries and settings from file. Saving to IndexedDB...`, false);
+            } else {
+                throw new Error("Log file content is invalid. Expected a structured JSON object or an array of URLs.");
+            }
+            
+            // 3. Update global state from imported data
+            completedLogUrls.clear();
+            newUrls.forEach(url => completedLogUrls.add(url));
+
+            applySettings(newSettings); // Apply imported settings
+
+            // 4. Save the imported state to IndexedDB for persistence
+            await saveAppState();
+
+            // Finalize UI updates after loading
+            logCountSpan.textContent = completedLogUrls.size;
+            exportLogButton.disabled = completedLogUrls.size === 0;
+
+            // If episodes are already loaded, re-render to apply 'previously_completed' status and filtering
+            if (episodes.length > 0) {
+                episodes.forEach(e => {
+                    // Check against the newly loaded log
+                    e.status = completedLogUrls.has(e.url) ? 'previously_completed' : 'available';
+                });
+            }
+            renderAvailableList();
+            
+        } catch (e) {
+            console.error(e);
+            showMessage(`Error processing log file: ${e.message}`, true);
+        }
+    };
+    reader.onerror = () => {
+        showMessage('Failed to read the log file.', true);
+    };
+    reader.readAsText(file);
+}
+
+/**
+ * Generates and downloads the current completed log and app settings as a JSON file (EXPORT).
+ */
+function exportLogFile() {
+    const logObject = getCurrentAppState();
+
+    const logJson = JSON.stringify(logObject, null, 2);
+    const blob = new Blob([logJson], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = LOG_FILENAME; 
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    const message = `The settings/log file (${LOG_FILENAME}) with ${logObject.completedLogUrls.length} entries has been generated and exported. Check your browser's downloads.`;
+    showMessage(message, false);
+    
+    renderAvailableList(); 
+}
+
+
+// --- Rendering Functions ---
+
+/**
+ * Renders the available episodes list.
+ */
+function renderAvailableList() {
+    availableList.innerHTML = '';
+    
+    const hideCompleted = hideCompletedCheckbox.checked;
+
+    // Check for newly completed items and update their status to 'previously_completed'
+    episodes.forEach(e => {
+        if (e.status === 'completed' && completedLogUrls.has(e.url)) {
+            e.status = 'previously_completed';
+        }
+    });
+
+    let filteredEpisodes = episodes;
+    if (hideCompleted) {
+        filteredEpisodes = episodes.filter(e => e.status !== 'previously_completed');
+    }
+
+    const availableToSelectCount = episodes.filter(e => e.status === 'available').length;
+
+    if (filteredEpisodes.length === 0) {
+        availableList.innerHTML = '<li class="p-3 text-gray-500 dark:text-gray-400 text-sm text-center">No episodes found or all visible episodes are hidden.</li>';
+        downloadAllButton.disabled = true;
+        downloadSelectedButton.disabled = true;
+        selectNextTenButton.disabled = true; 
+        const hiddenCount = episodes.length - filteredEpisodes.length;
+        episodeCountSpan.textContent = `${episodes.length} loaded${hiddenCount > 0 ? ` (${hiddenCount} hidden)` : ''}`;
+        return;
+    }
+
+    filteredEpisodes.forEach(episode => {
+        const li = document.createElement('li');
+        
+        // Disable interaction if it's currently involved in the queue (or just completed this session)
+        const disableInteraction = ['in_queue', 'downloading', 'paused', 'canceled', 'completed'].includes(episode.status);
+        
+        li.className = `episode-item p-3 flex items-center justify-between transition ${disableInteraction ? 'bg-gray-200 dark:bg-slate-600 cursor-not-allowed' : 'hover:bg-gray-100 dark:hover:bg-slate-600/50 cursor-pointer'} `;
+        li.dataset.id = episode.id;
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.className = 'form-checkbox h-5 w-5 text-indigo-600 border-gray-300 dark:border-slate-500 rounded focus:ring-indigo-500 dark:bg-slate-600';
+        
+        // Checkbox state: only checked if status is 'selected'
+        checkbox.checked = episode.status === 'selected';
+        
+        // Checkbox disabled logic: only disable if it's actively in the queue/downloading, OR just completed.
+        // If it is 'previously_completed' and visible (i.e., hideCompletedCheckbox is unchecked), we ENABLE it.
+        checkbox.disabled = disableInteraction; 
+
+        const titleSpan = document.createElement('span');
+        titleSpan.textContent = episode.title;
+        let statusClass = 'text-gray-800 dark:text-gray-200';
+        let statusTag = '';
+        
+        if (episode.status === 'completed') {
+            statusClass = 'text-green-600 dark:text-green-400 italic';
+            statusTag = ' (Completed in session)';
+        } else if (episode.status === 'previously_completed') {
+            statusClass = 'text-gray-500 dark:text-gray-400 line-through italic';
+            statusTag = ' (Downloaded)';
+        } else if (episode.status === 'failed') {
+            statusClass = 'text-red-600 dark:text-red-400';
+        }
+        
+        titleSpan.className = `ml-3 text-sm font-medium flex-grow truncate ${statusClass}`;
+        titleSpan.textContent = episode.title + statusTag;
+
+
+        // Event listener for selection (UPDATED LOGIC HERE)
+        checkbox.addEventListener('change', () => {
+            if (checkbox.checked) {
+                episode.status = 'selected';
+            } else {
+                // If the user unchecks, reset the status based on its history
+                if (completedLogUrls.has(episode.url)) {
+                    episode.status = 'previously_completed'; // Revert to previously_completed if it was in the log
+                } else {
+                    episode.status = 'available'; // Revert to available if it was a fresh selection
+                }
+            }
+            updateButtonStates();
+        });
+
+        li.appendChild(checkbox);
+        li.appendChild(titleSpan);
+        availableList.appendChild(li);
+    });
+
+    const hiddenCount = episodes.length - filteredEpisodes.length;
+    episodeCountSpan.textContent = `${episodes.length} loaded${hiddenCount > 0 ? ` (${hiddenCount} hidden)` : ''}`;
+    selectNextTenButton.disabled = availableToSelectCount === 0;
+    updateButtonStates();
+}
+
+function getStatusPriority(status) {
+    switch (status) {
+        case 'downloading':
+        case 'in_queue':
+        case 'paused':
+            return 1; 
+        case 'failed':
+        case 'canceled':
+        case 'completed':
+            return 2; 
+        default:
+            return 3;
+    }
+}
+
+/**
+ * Creates or updates a single LI element for the queue. (Implementation remains the same)
+ */
+function createOrUpdateQueueItem(episode) {
+    let li = queueList.querySelector(`[data-id="${episode.id}"]`);
+
+    if (!li) {
+        li = document.createElement('li');
+        li.className = 'episode-item p-3 flex flex-col space-y-1';
+        li.dataset.id = episode.id;
+
+        const header = document.createElement('div');
+        header.className = 'flex justify-between items-start';
+        header.innerHTML = `<div class="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate flex-grow">${episode.title}</div>`;
+        
+        const controlsDiv = document.createElement('div');
+        controlsDiv.className = 'flex space-x-2 ml-4 flex-shrink-0';
+        controlsDiv.dataset.role = 'controls';
+
+        const pauseResumeButton = document.createElement('button');
+        pauseResumeButton.className = 'text-xs text-indigo-500 hover:text-indigo-700 dark:text-indigo-300 dark:hover:text-indigo-500 font-medium transition duration-100';
+        pauseResumeButton.dataset.role = 'pause-resume-btn';
+        controlsDiv.appendChild(pauseResumeButton);
+
+        const cancelButton = document.createElement('button');
+        cancelButton.textContent = 'Cancel';
+        cancelButton.className = 'text-xs text-red-500 hover:text-red-700 dark:text-red-300 dark:hover:text-red-500 font-medium transition duration-100';
+        cancelButton.dataset.role = 'cancel-btn';
+        cancelButton.onclick = () => handleCancel(episode.id);
+        controlsDiv.appendChild(cancelButton);
+        
+        header.appendChild(controlsDiv); 
+
+        const statusContainer = document.createElement('div');
+        statusContainer.className = 'flex items-center space-x-2';
+        statusContainer.innerHTML = `<div class="text-xs italic" data-role="status-text"></div>`;
+
+        const progressBar = document.createElement('div');
+        progressBar.className = 'w-full bg-gray-200 dark:bg-slate-600 rounded-full h-1.5 mt-1';
+        progressBar.innerHTML = `<div class="h-1.5 rounded-full transition-all duration-300" data-role="progress-bar-filler"></div>`;
+
+        li.appendChild(header);
+        li.appendChild(statusContainer);
+        li.appendChild(progressBar);
+    }
+
+    const statusSpan = li.querySelector('[data-role="status-text"]');
+    const filler = li.querySelector('[data-role="progress-bar-filler"]');
+    const pauseResumeButton = li.querySelector('[data-role="pause-resume-btn"]');
+    const cancelButton = li.querySelector('[data-role="cancel-btn"]');
+    
+    let statusText = '';
+    let statusClass = 'text-gray-500 dark:text-gray-400';
+    let barColor = 'bg-blue-500';
+
+    pauseResumeButton.classList.add('hidden');
+    cancelButton.classList.add('hidden');
+
+
+    if (episode.status === 'in_queue') {
+        statusText = 'Awaiting start...';
+        statusClass = 'text-yellow-600 dark:text-yellow-400';
+        
+        cancelButton.classList.remove('hidden');
+
+    } else if (episode.status === 'downloading') {
+        const progress = (episode.progress || 0).toFixed(1);
+        const formattedSpeed = formatSpeed(episode.speed || 0);
+        const total = episode.totalBytes > 0 ? formatSize(episode.totalBytes) : 'Unknown Size';
+        const downloaded = formatSize(episode.downloadedBytes);
+
+        statusText = `Downloading: ${progress}% @ <span class="w-speed-stat text-right">${formattedSpeed}</span> (${downloaded}/${total})`;
+        statusClass = 'text-blue-600 dark:text-blue-400';
+        barColor = 'bg-blue-500';
+
+        pauseResumeButton.classList.remove('hidden');
+        cancelButton.classList.remove('hidden');
+
+        pauseResumeButton.textContent = 'Pause';
+        pauseResumeButton.onclick = () => handlePause(episode.id);
+
+    } else if (episode.status === 'paused') {
+        statusText = `Paused. Progress: ${episode.progress.toFixed(1)}%`;
+        statusClass = 'text-gray-500 dark:text-gray-400';
+        barColor = 'bg-gray-400';
+
+        pauseResumeButton.classList.remove('hidden');
+        cancelButton.classList.remove('hidden');
+
+        pauseResumeButton.textContent = 'Resume';
+        pauseResumeButton.onclick = () => handleResume(episode.id);
+        
+    } else if (episode.status === 'completed') {
+        statusText = 'Completed!';
+        statusClass = 'text-green-600 dark:text-green-400';
+        barColor = 'bg-green-500';
+    } else if (episode.status === 'failed') {
+        statusText = `Failed: ${episode.error || 'Unknown error'}`;
+        statusClass = 'text-red-600 dark:text-red-400';
+        barColor = 'bg-red-500';
+        
+        pauseResumeButton.classList.remove('hidden');
+        pauseResumeButton.textContent = 'Retry';
+        pauseResumeButton.onclick = () => {
+            episode.status = 'in_queue'; 
+            episode.error = null;
+            renderQueueList();
+            checkQueue();
+        };
+
+    } else if (episode.status === 'canceled') {
+        statusText = `Canceled. Downloaded: ${formatSize(episode.downloadedBytes)}`;
+        statusClass = 'text-red-400 dark:text-red-300';
+        barColor = 'bg-red-300';
+        
+        if (episode.downloadedBytes > 0) {
+             pauseResumeButton.classList.remove('hidden');
+             pauseResumeButton.textContent = 'Resume';
+             pauseResumeButton.onclick = () => handleResume(episode.id);
+        }
+    }
+
+    statusSpan.innerHTML = statusText;
+    statusSpan.className = `text-xs italic ${statusClass}`;
+    
+    filler.className = `${barColor} h-1.5 rounded-full transition-all duration-300`;
+    filler.style.width = `${episode.progress}%`;
+
+    return li;
+}
+
+/**
+ * Renders the download queue using a keyed update approach. (Implementation remains the same)
+ */
+function renderQueueList() {
+    const activeAndQueued = episodes.filter(e => ['in_queue', 'downloading', 'paused', 'failed', 'completed', 'canceled'].includes(e.status));
+    
+    let totalSpeed = 0; 
+    let activeCount = 0;
+    let queuedCount = 0;
+    let completedCount = 0;
+    
+    episodes.forEach(e => {
+        if (e.status === 'downloading') {
+            totalSpeed += e.speed || 0;
+            activeCount++;
+        } else if (e.status === 'in_queue' || e.status === 'paused') {
+            queuedCount++;
+        } else if (e.status === 'completed') {
+            completedCount++;
+        }
+    });
+
+    document.getElementById('activeCount').textContent = activeCount.toString();
+    document.getElementById('queuedCount').textContent = queuedCount.toString();
+    document.getElementById('completedCount').textContent = completedCount.toString();
+    document.getElementById('totalSpeed').textContent = formatSpeed(totalSpeed);
+
+    clearCompletedButton.disabled = completedCount === 0;
+
+    if (activeAndQueued.length === 0) {
+        queueList.innerHTML = '<li class="p-3 text-gray-500 dark:text-gray-400 text-sm text-center">Downloads will appear here.</li>';
+        return;
+    }
+
+    activeAndQueued.sort((a, b) => {
+        const priorityA = getStatusPriority(a.status);
+        const priorityB = getStatusPriority(b.status);
+        if (priorityA !== priorityB) {
+            return priorityA - priorityB;
+        }
+        return a.listIndex - b.listIndex;
+    });
+    
+    const existingIds = new Set(Array.from(queueList.children).map(child => child.dataset.id).filter(id => id));
+    const activeIds = new Set(activeAndQueued.map(e => e.id));
+    
+    const newItemsMap = new Map();
+
+    activeAndQueued.forEach(episode => {
+        const li = createOrUpdateQueueItem(episode);
+        newItemsMap.set(episode.id, li);
+    });
+
+    let fragment = document.createDocumentFragment();
+    activeAndQueued.forEach(episode => {
+        fragment.appendChild(newItemsMap.get(episode.id));
+    });
+    
+    if (queueList.children.length === 1 && queueList.children[0].textContent.includes('Downloads will appear here')) {
+        queueList.innerHTML = '';
+    }
+
+    queueList.replaceChildren(...Array.from(fragment.children));
+
+    existingIds.forEach(id => {
+        if (!activeIds.has(id)) {
+            const itemToRemove = queueList.querySelector(`[data-id="${id}"]`);
+            if (itemToRemove) {
+                itemToRemove.remove();
+            }
+        }
+    });
+}
+
+function updateButtonStates() {
+    const activeOrQueuedCount = episodes.filter(e => ['in_queue', 'downloading', 'paused'].includes(e.status)).length;
+    const availableCount = episodes.filter(e => e.status === 'available').length;
+    const selectedCount = episodes.filter(e => e.status === 'selected').length;
+    
+    const pausedCount = episodes.filter(e => e.status === 'paused').length;
+    
+    // Check if there are any available or selectable items
+    const episodesToDownload = episodes.filter(e => e.status === 'available' || e.status === 'previously_completed');
+
+    downloadAllButton.disabled = episodesToDownload.length === 0;
+    downloadSelectedButton.disabled = selectedCount === 0;
+    
+    resumeAllButton.disabled = pausedCount === 0;
+    
+    pauseAllButton.disabled = activeOrQueuedCount === 0;
+    cancelAllButton.disabled = activeOrQueuedCount === 0;
+}
+
+// --- Main Logic: Fetching and Downloading ---
+
+async function fetchAndParseRss(url) {
+    clearMessages();
+    fetchButton.disabled = true;
+    fetchButton.textContent = 'Fetching...';
+
+    try {
+        const response = await fetchWithRetry(async () => {
+            const fetchResponse = await fetch(url, { method: 'GET' });
+            if (!fetchResponse.ok) {
+                throw new Error(`HTTP error! Status: ${fetchResponse.status}.`);
+            }
+            return fetchResponse.text();
+        });
+
+        const xmlText = response;
+
+        episodes = extractEpisodes(xmlText);
+        renderAvailableList();
+        showMessage(`Successfully loaded ${episodes.length} episodes. (${completedLogUrls.size} log entries checked)`, false);
+        
+        // Update the appSettings when a new feed is successfully loaded and save
+        appSettings.rssUrl = url;
+        saveAppState(); 
+
+    } catch (error) {
+        console.error("Fetch/Parse Error:", error);
+        let message = `Failed to load RSS feed from ${url}.`;
+        if (error.message.includes('Failed to fetch')) {
+            message += " This might be due to a CORS restriction or an invalid URL.";
+        } else if (error.message.includes('HTTP error')) {
+            message += ` The server returned an error: ${error.message}`;
+        } else {
+             message += ` Error details: ${error.message}`;
+        }
+        showMessage(message, true);
+        episodes = [];
+        renderAvailableList();
+    } finally {
+        fetchButton.disabled = false;
+        fetchButton.textContent = 'Fetch Episodes';
+    }
+}
+
+async function startDownload(episodeId) {
+    const episode = episodes.find(e => e.id === episodeId);
+
+    if (['completed', 'previously_completed'].includes(episode.status)) {
+        checkQueue();
+        return;
+    }
+
+    if (!episode || activeDownloads >= concurrentLimit) {
+        if (episode) episode.status = 'in_queue';
+        renderQueueList();
+        return;
+    }
+    
+    activeDownloads++;
+    episode.status = 'downloading';
+    
+    episode.controller = new AbortController();
+    episode.startTime = Date.now(); 
+    episode.lastUpdateTime = Date.now();
+    
+    const headers = {};
+    if (episode.downloadedBytes > 0) {
+        headers['Range'] = `bytes=${episode.downloadedBytes}-`;
+    }
+
+    renderQueueList(); 
+
+    try {
+        const response = await fetchWithRetry(() => fetch(episode.url, { 
+            method: 'GET',
+            signal: episode.controller.signal,
+            headers: headers
+        }));
+
+        if (!response.ok) {
+            throw new Error(`Server returned status: ${response.status}`);
+        }
+
+        const contentLength = response.headers.get('content-length');
+        
+        const total = contentLength ? parseInt(contentLength, 10) : (episode.totalBytes || 0);
+        episode.totalBytes = total;
+        
+        let loaded = 0;
+        const reader = response.body.getReader();
+        const chunks = [];
+        const initialBytes = episode.downloadedBytes;
+
+        let done, value;
+        while ({done, value} = await reader.read(), !done) {
+            
+            if (episode.status !== 'downloading') { break; }
+
+            chunks.push(value);
+            loaded += value.length;
+            
+            const currentBytes = initialBytes + loaded;
+            const currentTime = Date.now();
+            
+            const timeElapsed = (currentTime - episode.lastUpdateTime) / 1000;
+            const bytesSinceLastUpdate = currentBytes - episode.downloadedBytes;
+            
+            if (timeElapsed > 0.3) { 
+                episode.speed = bytesSinceLastUpdate / timeElapsed;
+                episode.lastUpdateTime = currentTime;
+                
+                episode.downloadedBytes = currentBytes;
+                if (episode.totalBytes > 0) {
+                    episode.progress = (episode.downloadedBytes / episode.totalBytes) * 100;
+                } else {
+                    episode.progress = Math.min(99.9, episode.progress + 0.1); 
+                }
+                renderQueueList(); 
+            }
+        }
+        
+        if (episode.status === 'downloading') {
+            const blob = new Blob(chunks, { type: response.headers.get('content-type') || 'audio/mpeg' });
+            
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = episode.fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(a.href);
+
+            episode.status = 'completed';
+            episode.progress = 100;
+            
+            // --- LOGGING & PERSISTENCE STEP ---
+            completedLogUrls.add(episode.url);
+            logCountSpan.textContent = completedLogUrls.size;
+            exportLogButton.disabled = false;
+            saveAppState(); // Save updated log to IndexedDB
+        }
+        
+    } catch (error) {
+        if (error.name === 'AbortError') {
+            console.log(`Download for ${episode.title} was aborted (Paused/Canceled).`);
+        } else {
+            console.error(`Download failed for ${episode.title}:`, error);
+            episode.status = 'failed';
+            episode.error = error.message;
+        }
+    } finally {
+        if (['failed', 'completed', 'paused', 'canceled'].includes(episode.status)) {
+            activeDownloads = Math.max(0, activeDownloads - 1); 
+        }
+
+        episode.controller = null;
+        episode.startTime = null;
+        episode.speed = 0;
+        
+        const sourceEpisode = episodes.find(e => e.id === episode.id);
+        if (sourceEpisode) {
+             if (!['paused', 'canceled'].includes(episode.status)) {
+                sourceEpisode.status = episode.status;
+             }
+        }
+        
+        renderQueueList();
+        checkQueue(); 
+    }
+}
+
+function handleCancel(episodeId) {
+    const episode = episodes.find(e => e.id === episodeId);
+    if (!episode) return;
+    episode.status = 'canceled';
+    if (episode.controller) { 
+        episode.controller.abort(); 
+    } else { 
+        checkQueue(); 
+    }
+    episode.speed = 0;
+    renderAvailableList();
+    renderQueueList();
+    updateButtonStates();
+}
+
+function handlePause(episodeId) {
+    const episode = episodes.find(e => e.id === episodeId);
+    if (!episode) return;
+    episode.status = 'paused'; 
+    if (episode.controller) { 
+        episode.controller.abort(); 
+    } else {
+        checkQueue();
+    }
+    episode.speed = 0;
+    renderQueueList();
+    updateButtonStates();
+    saveAppState(); // Save paused state
+}
+
+function handleResume(episodeId) {
+    const episode = episodes.find(e => e.id === episodeId);
+    if (!episode || episode.status !== 'paused' && episode.status !== 'canceled') return;
+    episode.status = 'in_queue';
+    episode.lastUpdateTime = Date.now();
+    renderQueueList();
+    updateButtonStates();
+    checkQueue();
+}
+
+function handleResumeAll() {
+    episodes.forEach(e => {
+        if (e.status === 'paused' || e.status === 'canceled') {
+            e.status = 'in_queue';
+        }
+    });
+    renderAvailableList();
+    renderQueueList();
+    updateButtonStates();
+    checkQueue(); 
+}
+
+function handlePauseAll() {
+    episodes.forEach(e => {
+        if (e.status === 'in_queue' || e.status === 'downloading') {
+            if (e.status === 'downloading' && e.controller) { e.controller.abort(); }
+            e.status = 'paused';
+            e.speed = 0;
+        }
+    });
+    activeDownloads = 0; 
+    renderAvailableList();
+    renderQueueList();
+    updateButtonStates();
+    saveAppState(); // Save paused state
+    checkQueue();
+}
+
+function handleCancelAll() {
+    episodes.forEach(e => {
+        if (['in_queue', 'downloading', 'paused'].includes(e.status)) {
+            if (e.status === 'downloading' && e.controller) { e.controller.abort(); }
+            e.status = 'canceled';
+            e.speed = 0;
+            e.error = 'Canceled by user.';
+        }
+    });
+    activeDownloads = 0; 
+    renderAvailableList();
+    renderQueueList();
+    updateButtonStates();
+    checkQueue(); 
+}
+
+function checkQueue() {
+    concurrentLimit = parseInt(concurrentInput.value) || 1;
+    concurrentLimit = Math.max(1, Math.min(100, concurrentLimit)); 
+    
+    const queuedEpisodes = episodes
+        .filter(e => e.status === 'in_queue')
+        .sort((a, b) => a.listIndex - b.listIndex);
+
+    let remainingSlots = concurrentLimit - activeDownloads;
+    
+    for (let i = 0; i < remainingSlots && i < queuedEpisodes.length; i++) {
+        startDownload(queuedEpisodes[i].id);
+    }
+    
+    const totalInProgress = episodes.filter(e => ['in_queue', 'downloading', 'paused'].includes(e.status)).length;
+
+    // --- AUTO-EXPORT LOG CHECK (Updated name) ---
+    if (totalInProgress === 0) {
+        if (completedLogUrls.size > 0 && autoDownloadLogCheckbox.checked) {
+            exportLogFile();
+        }
+    }
+    
+    renderAvailableList();
+}
+
+
+// --- Event Handlers ---
+
+// Theme Toggle Handler
+darkModeToggle.addEventListener('change', () => {
+    const newTheme = darkModeToggle.checked ? 'dark' : 'light';
+    applyTheme(newTheme);
+    appSettings.theme = newTheme;
+    saveAppState();
+});
+
+fetchButton.addEventListener('click', () => {
+    const currentRssUrl = rssUrlInput.value.trim();
+    if (currentRssUrl) {
+        fetchAndParseRss(currentRssUrl);
+    } else {
+        showMessage('Please enter an RSS Feed URL.', true);
+    }
+});
+
+concurrentInput.addEventListener('change', () => {
+    let value = parseInt(concurrentInput.value) || 1;
+    value = Math.max(1, Math.min(100, value));
+    concurrentInput.value = value;
+    appSettings.concurrentLimit = value;
+    saveAppState(); // Save the new limit to IDB
+    checkQueue(); 
+});
+
+downloadAllButton.addEventListener('click', () => {
+    episodes.forEach(e => {
+        if (e.status === 'available' || e.status === 'previously_completed' || e.status === 'selected') {
+            e.status = 'in_queue';
+        }
+    });
+    renderAvailableList();
+    checkQueue();
+});
+
+downloadSelectedButton.addEventListener('click', () => {
+    episodes.forEach(e => {
+        if (e.status === 'selected') {
+            e.status = 'in_queue';
+        }
+    });
+    renderAvailableList();
+    checkQueue();
+});
+
+selectNextTenButton.addEventListener('click', () => {
+    const availableEpisodes = episodes.filter(e => e.status === 'available');
+    
+    let selectedCount = 0;
+    for (let i = 0; i < Math.min(10, availableEpisodes.length); i++) {
+        const episode = availableEpisodes[i];
+        if (episode.status === 'available') {
+            episode.status = 'selected';
+            selectedCount++;
+        }
+    }
+
+    if (selectedCount > 0) {
+        showMessage(`Selected the next ${selectedCount} available episodes.`, false);
+    } else {
+        showMessage("No more available episodes to select.", true);
+    }
+    
+    renderAvailableList();
+});
+
+resumeAllButton.addEventListener('click', handleResumeAll);
+pauseAllButton.addEventListener('click', handlePauseAll);
+cancelAllButton.addEventListener('click', handleCancelAll);
+
+clearCompletedButton.addEventListener('click', () => {
+    episodes = episodes.filter(e => !['completed', 'failed', 'canceled'].includes(e.status));
+
+    renderAvailableList();
+    renderQueueList();
+    updateButtonStates();
+    showMessage("Finished downloads cleared from the queue.", false);
+});
+
+
+// --- Log Handlers (Updated event listeners) ---
+
+importLogButton.addEventListener('click', () => {
+    logFileInput.click();
+});
+
+logFileInput.addEventListener('change', (event) => {
+    const file = event.target.files[0];
+    if (file) {
+        importLogFile(file);
+    }
+    event.target.value = '';
+});
+
+exportLogButton.addEventListener('click', exportLogFile);
+
+hideCompletedCheckbox.addEventListener('change', () => {
+    appSettings.hidePreviousState = hideCompletedCheckbox.checked;
+    saveAppState(); // Save checkbox state
+    renderAvailableList();
+});
+
+autoDownloadLogCheckbox.addEventListener('change', () => {
+    appSettings.autoDownloadLogState = autoDownloadLogCheckbox.checked;
+    saveAppState(); // Save checkbox state
+});
+
+
+// --- Initial Setup ---
+async function setupApp() {
+    const loadedState = await loadStateFromDB();
+    
+    if (loadedState) {
+        // Load log first
+        const newUrls = loadedState.completedLogUrls || [];
+        completedLogUrls.clear();
+        newUrls.forEach(url => completedLogUrls.add(url));
+
+        // Load settings
+        applySettings(loadedState.appSettings || {});
+        
+        showMessage(`Loaded ${completedLogUrls.size} log entries and settings from local persistence.`, false);
+    } else {
+        // Apply default settings if nothing loaded, and save them.
+        applySettings(appSettings);
+        saveAppState();
+        showMessage("No saved data found. Initialized with default settings.", false);
+    }
+
+    // Initialize UI from final state
+    rssUrlInput.value = appSettings.rssUrl;
+    concurrentInput.value = appSettings.concurrentLimit;
+    hideCompletedCheckbox.checked = appSettings.hidePreviousState;
+    autoDownloadLogCheckbox.checked = appSettings.autoDownloadLogState;
+    
+    concurrentLimit = appSettings.concurrentLimit;
+    
+    // Final theme application (must happen after appSettings are loaded)
+    loadTheme(); 
+
+    logCountSpan.textContent = completedLogUrls.size;
+    exportLogButton.disabled = completedLogUrls.size === 0;
+    renderAvailableList(); 
+    renderQueueList();
+    updateButtonStates();
+}
+
+window.onload = setupApp;
+
+</script>
+</body>
+</html>
